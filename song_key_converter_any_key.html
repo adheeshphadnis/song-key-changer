@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Song Key Converter</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: #FDF8F0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      font-family: Georgia, serif;
+    }
+    .card {
+      background: white;
+      border-radius: 28px;
+      padding: 44px 40px;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 4px 32px rgba(180,130,40,0.12);
+      border: 1px solid #EDE0C4;
+    }
+    .header { text-align: center; margin-bottom: 28px; }
+    .header .icon { font-size: 44px; line-height: 1; margin-bottom: 8px; }
+    .header h1 { font-size: 28px; font-weight: 700; color: #2B1800; letter-spacing: -0.5px; }
+    .header p { color: #9A6E20; font-size: 14px; margin-top: 7px; font-family: system-ui, sans-serif; }
+
+    .dropzone {
+      border: 2.5px dashed #DDD;
+      border-radius: 18px;
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      background: #FAFAFA;
+      transition: all 0.18s;
+      margin-bottom: 20px;
+    }
+    .dropzone:hover, .dropzone.dragover { border-color: #C47A0A; background: #FFFAEE; }
+    .dropzone.has-file { border-color: #C47A0A; background: #FFFCF4; }
+    .dropzone .dz-icon { font-size: 28px; margin-bottom: 7px; }
+    .dropzone .dz-label { font-weight: 700; color: #555; font-size: 16px; font-family: system-ui, sans-serif; }
+    .dropzone .dz-sub { color: #BBB; font-size: 12px; margin-top: 4px; font-family: system-ui, sans-serif; }
+    .dropzone .dz-filename { font-weight: 600; color: #3D2000; font-size: 14px; word-break: break-all; font-family: system-ui, sans-serif; }
+
+    .key-picker { margin-bottom: 20px; }
+    .key-picker label { display: block; font-size: 13px; color: #9A6E20; font-family: system-ui, sans-serif; margin-bottom: 10px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; }
+
+    .key-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 7px;
+      margin-bottom: 10px;
+    }
+    .key-btn {
+      padding: 10px 4px;
+      border-radius: 10px;
+      border: 1.5px solid #E8DCC8;
+      background: #FDFAF4;
+      color: #5A3A00;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: system-ui, sans-serif;
+      transition: all 0.13s;
+      text-align: center;
+    }
+    .key-btn:hover { border-color: #C47A0A; background: #FFF3D6; color: #7A4A00; }
+    .key-btn.selected { background: #C47A0A; border-color: #C47A0A; color: white; }
+
+    .mode-toggle {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .mode-btn {
+      flex: 1;
+      padding: 9px 0;
+      border-radius: 10px;
+      border: 1.5px solid #E8DCC8;
+      background: #FDFAF4;
+      color: #5A3A00;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: system-ui, sans-serif;
+      transition: all 0.13s;
+      text-align: center;
+    }
+    .mode-btn:hover { border-color: #C47A0A; background: #FFF3D6; }
+    .mode-btn.selected { background: #C47A0A; border-color: #C47A0A; color: white; }
+
+    .target-display {
+      background: #FFFAEE;
+      border: 1px solid #EDD888;
+      border-radius: 12px;
+      padding: 10px 16px;
+      margin-top: 10px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+      color: #7A5500;
+      text-align: center;
+    }
+    .target-display strong { color: #3D2000; font-size: 15px; }
+
+    .btn-convert {
+      width: 100%; padding: 17px 0; border-radius: 14px; border: none;
+      background: #C47A0A; color: white; font-size: 16px; font-weight: 700;
+      cursor: pointer; font-family: system-ui, sans-serif; letter-spacing: 0.3px;
+      margin-bottom: 8px; transition: background 0.15s;
+    }
+    .btn-convert:hover { background: #A56508; }
+
+    .btn-download {
+      display: block; text-align: center; padding: 17px 0; border-radius: 14px;
+      background: #1E7A46; color: white; font-size: 16px; font-weight: 700;
+      text-decoration: none; font-family: system-ui, sans-serif; margin-bottom: 12px;
+      transition: background 0.15s;
+    }
+    .btn-download:hover { background: #155E35; }
+
+    .btn-reset {
+      width: 100%; padding: 11px 0; border-radius: 12px; border: 1.5px solid #DDD;
+      background: transparent; color: #999; font-size: 14px; cursor: pointer;
+      font-family: system-ui, sans-serif; transition: border-color 0.15s;
+    }
+    .btn-reset:hover { border-color: #BBB; color: #666; }
+
+    .result-badge {
+      background: #FFFAEE; border-radius: 14px; padding: 14px 20px;
+      margin-bottom: 16px; text-align: center; border: 1px solid #EDD888;
+    }
+    .result-badge .rb-label { font-size: 12px; color: #B08830; font-family: system-ui, sans-serif; margin-bottom: 2px; }
+    .result-badge .rb-arrow { font-size: 22px; color: #DDB840; margin: 6px 0; }
+    .result-badge .rb-keys { display: flex; align-items: center; justify-content: center; gap: 14px; }
+    .result-badge .rb-key { font-weight: 700; font-size: 22px; color: #4A2E00; }
+    .result-badge .rb-key.target { color: #1E7A46; }
+    .result-badge .rb-check { font-size: 13px; color: #1E7A46; font-family: system-ui, sans-serif; margin-top: 4px; font-weight: 600; }
+
+    .already-badge {
+      background: #F0FFF6; border-radius: 14px; padding: 16px 20px;
+      margin-bottom: 16px; text-align: center; border: 1px solid #9EE0BB;
+      font-family: system-ui, sans-serif;
+    }
+    .already-badge .ab-title { font-weight: 700; font-size: 17px; color: #1E7A46; }
+    .already-badge .ab-sub { font-size: 13px; color: #888; margin-top: 4px; }
+
+    .processing {
+      text-align: center; padding: 20px 0; font-family: system-ui, sans-serif;
+    }
+    .processing .spin { font-size: 28px; margin-bottom: 8px; display: inline-block; animation: pulse 1.4s ease-in-out infinite; }
+    .processing .msg { font-weight: 600; color: #C47A0A; font-size: 15px; }
+    .processing .sub { color: #CCC; font-size: 12px; margin-top: 4px; }
+
+    .error-box {
+      background: #FFF5F5; border: 1px solid #F5C6C6; border-radius: 10px;
+      padding: 14px; color: #A02020; font-size: 14px; margin-top: 8px;
+      font-family: system-ui, sans-serif;
+    }
+
+    .footer { text-align: center; color: #CCC; font-size: 12px; margin-top: 20px; font-family: system-ui, sans-serif; }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <div class="icon">♪</div>
+    <h1>Song Key Converter</h1>
+    <p>Auto-detects the key and converts to any key you choose</p>
+  </div>
+
+  <!-- File drop zone -->
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="fileInput" accept="audio/*" style="display:none" />
+    <div class="dz-icon" id="dzIcon">📂</div>
+    <div class="dz-label" id="dzLabel">Tap here to choose your song</div>
+    <div class="dz-sub" id="dzSub">MP3 and WAV files work great</div>
+  </div>
+
+  <!-- Key picker -->
+  <div class="key-picker">
+    <label>Convert to key</label>
+    <div class="key-grid" id="keyGrid"></div>
+    <div class="mode-toggle">
+      <button class="mode-btn selected" id="btnMajor" onclick="selectMode('major')">Major</button>
+      <button class="mode-btn" id="btnMinor" onclick="selectMode('minor')">Minor</button>
+    </div>
+    <div class="target-display" id="targetDisplay">Target: <strong>A Major</strong></div>
+  </div>
+
+  <!-- Convert button -->
+  <div id="convertBtn" style="display:none">
+    <button class="btn-convert" id="btnConvert">✨ Convert Song</button>
+  </div>
+
+  <!-- Processing -->
+  <div id="processingDiv" style="display:none" class="processing">
+    <div class="spin">⏳</div>
+    <div class="msg" id="procMsg">Working...</div>
+    <div class="sub">Keep this tab open while it works</div>
+  </div>
+
+  <!-- Result badge -->
+  <div id="resultBadge" style="display:none" class="result-badge">
+    <div class="rb-label">Conversion complete</div>
+    <div class="rb-keys">
+      <div class="rb-key" id="rbFrom"></div>
+      <div style="font-size:20px;color:#DDB840">→</div>
+      <div class="rb-key target" id="rbTo"></div>
+    </div>
+    <div class="rb-check">✓ Done</div>
+  </div>
+
+  <!-- Already in key -->
+  <div id="alreadyBadge" style="display:none" class="already-badge">
+    <div class="ab-title" id="alreadyTitle">✓ Already in that key!</div>
+    <div class="ab-sub">No conversion needed for this song.</div>
+  </div>
+
+  <!-- Download -->
+  <div id="downloadDiv" style="display:none">
+    <a id="downloadLink" class="btn-download" href="#" download="">⬇️ Download Converted Song</a>
+    <button class="btn-reset" id="btnReset">Convert another song</button>
+  </div>
+
+  <div id="errorBox" style="display:none" class="error-box"></div>
+  <div class="footer">🔒 Your song never leaves your device</div>
+</div>
+
+<script>
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
+const MAJOR_PROFILE = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88]
+const MINOR_PROFILE = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17]
+
+let currentFile = null
+let selectedKey = 9   // A
+let selectedMode = 'major'
+
+// Build key grid
+const grid = document.getElementById('keyGrid')
+NOTE_NAMES.forEach((note, i) => {
+  const btn = document.createElement('button')
+  btn.className = 'key-btn' + (i === 9 ? ' selected' : '')
+  btn.textContent = note
+  btn.dataset.key = i
+  btn.onclick = () => selectKey(i)
+  grid.appendChild(btn)
+})
+
+function selectKey(idx) {
+  selectedKey = idx
+  document.querySelectorAll('.key-btn').forEach(b => b.classList.toggle('selected', +b.dataset.key === idx))
+  updateTargetDisplay()
+}
+
+function selectMode(mode) {
+  selectedMode = mode
+  document.getElementById('btnMajor').classList.toggle('selected', mode === 'major')
+  document.getElementById('btnMinor').classList.toggle('selected', mode === 'minor')
+  updateTargetDisplay()
+}
+
+function updateTargetDisplay() {
+  document.getElementById('targetDisplay').innerHTML = 'Target: <strong>' + NOTE_NAMES[selectedKey] + ' ' + cap(selectedMode) + '</strong>'
+}
+
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1) }
+
+// FFT
+function iterativeFFT(re, im) {
+  const n = re.length
+  let j = 0
+  for (let i = 1; i < n; i++) {
+    let bit = n >> 1
+    for (; j & bit; bit >>= 1) j ^= bit
+    j ^= bit
+    if (i < j) {
+      let t = re[i]; re[i] = re[j]; re[j] = t
+      t = im[i]; im[i] = im[j]; im[j] = t
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = -2 * Math.PI / len
+    const wRe = Math.cos(ang), wIm = Math.sin(ang)
+    for (let i = 0; i < n; i += len) {
+      let uRe = 1, uIm = 0
+      for (let k = 0; k < (len >> 1); k++) {
+        const idx = i + k + (len >> 1)
+        const eR = re[i+k], eI = im[i+k]
+        const oR = re[idx]*uRe - im[idx]*uIm
+        const oI = re[idx]*uIm + im[idx]*uRe
+        re[i+k] = eR+oR; im[i+k] = eI+oI
+        re[idx] = eR-oR; im[idx] = eI-oI
+        const nr = uRe*wRe - uIm*wIm
+        uIm = uRe*wIm + uIm*wRe; uRe = nr
+      }
+    }
+  }
+}
+
+async function detectKey(file) {
+  const ab = await file.arrayBuffer()
+  const ctx = new AudioContext()
+  const originalBuffer = await ctx.decodeAudioData(ab)
+  await ctx.close()
+  const sr = 8000
+  const offCtx = new OfflineAudioContext(1, Math.ceil(originalBuffer.duration * sr), sr)
+  const src = offCtx.createBufferSource()
+  src.buffer = originalBuffer
+  src.connect(offCtx.destination)
+  src.start(0)
+  const resampled = await offCtx.startRendering()
+  const data = resampled.getChannelData(0)
+  const N = 2048, hop = 4096
+  const chroma = new Float64Array(12)
+  const hann = Array.from({length: N}, (_, i) => 0.5*(1-Math.cos(2*Math.PI*i/(N-1))))
+  for (let s = 0; s + N < data.length; s += hop) {
+    const re = new Float64Array(N), im = new Float64Array(N)
+    for (let i = 0; i < N; i++) re[i] = data[s+i] * hann[i]
+    iterativeFFT(re, im)
+    for (let k = 1; k < N/2; k++) {
+      const freq = k * sr / N
+      if (freq < 27.5 || freq > 4000) continue
+      const midi = 12*Math.log2(freq/440)+69
+      const bin = ((Math.round(midi) % 12) + 12) % 12
+      chroma[bin] += Math.sqrt(re[k]**2 + im[k]**2)
+    }
+  }
+  const mx = Math.max(...chroma)
+  const norm = Array.from(chroma, v => v/(mx+1e-8))
+  const corr = (a, b) => {
+    const mA = a.reduce((x,y)=>x+y)/12, mB = b.reduce((x,y)=>x+y)/12
+    let num=0,dA=0,dB=0
+    for(let i=0;i<12;i++){num+=(a[i]-mA)*(b[i]-mB);dA+=(a[i]-mA)**2;dB+=(b[i]-mB)**2}
+    return num/(Math.sqrt(dA*dB)+1e-8)
+  }
+  let best=-Infinity, bestKey=0, bestMode='major'
+  for (let i=0;i<12;i++){
+    const rot=[...norm.slice(i),...norm.slice(0,i)]
+    const mc=corr(rot,MAJOR_PROFILE), nc=corr(rot,MINOR_PROFILE)
+    if(mc>best){best=mc;bestKey=i;bestMode='major'}
+    if(nc>best){best=nc;bestKey=i;bestMode='minor'}
+  }
+  return { key: bestKey, mode: bestMode, name: NOTE_NAMES[bestKey] }
+}
+
+function encodeWAV(audioBuffer) {
+  const ch = audioBuffer.getChannelData(0)
+  const buf = new ArrayBuffer(44 + ch.length*2)
+  const v = new DataView(buf)
+  const ws = (o,s) => {for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))}
+  ws(0,'RIFF');v.setUint32(4,36+ch.length*2,true);ws(8,'WAVE')
+  ws(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true)
+  v.setUint16(22,1,true);v.setUint32(24,audioBuffer.sampleRate,true)
+  v.setUint32(28,audioBuffer.sampleRate*2,true);v.setUint16(32,2,true)
+  v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,ch.length*2,true)
+  let off=44
+  for(let i=0;i<ch.length;i++){
+    const s=Math.max(-1,Math.min(1,ch[i]))
+    v.setInt16(off,s<0?s*32768:s*32767,true);off+=2
+  }
+  return buf
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBox')
+  el.textContent = '⚠️ ' + msg
+  el.style.display = 'block'
+}
+
+function setProcessing(msg) {
+  document.getElementById('processingDiv').style.display = 'block'
+  document.getElementById('procMsg').textContent = msg
+  document.getElementById('convertBtn').style.display = 'none'
+}
+
+function pickFile(f) {
+  if (!f || !f.type.startsWith('audio/')) { showError('Please choose an audio file (MP3, WAV, etc.)'); return }
+  currentFile = f
+  document.getElementById('dzIcon').textContent = '🎶'
+  document.getElementById('dzLabel').className = 'dz-filename'
+  document.getElementById('dzLabel').textContent = f.name
+  document.getElementById('dzSub').textContent = 'Tap to choose a different song'
+  document.getElementById('dropzone').classList.add('has-file')
+  document.getElementById('convertBtn').style.display = 'block'
+  document.getElementById('errorBox').style.display = 'none'
+  document.getElementById('resultBadge').style.display = 'none'
+  document.getElementById('alreadyBadge').style.display = 'none'
+  document.getElementById('downloadDiv').style.display = 'none'
+}
+
+function reset() {
+  currentFile = null
+  document.getElementById('dzIcon').textContent = '📂'
+  document.getElementById('dzLabel').className = 'dz-label'
+  document.getElementById('dzLabel').textContent = 'Tap here to choose your song'
+  document.getElementById('dzSub').textContent = 'MP3 and WAV files work great'
+  document.getElementById('dropzone').classList.remove('has-file')
+  document.getElementById('convertBtn').style.display = 'none'
+  document.getElementById('processingDiv').style.display = 'none'
+  document.getElementById('resultBadge').style.display = 'none'
+  document.getElementById('alreadyBadge').style.display = 'none'
+  document.getElementById('downloadDiv').style.display = 'none'
+  document.getElementById('errorBox').style.display = 'none'
+  document.getElementById('fileInput').value = ''
+}
+
+async function convert() {
+  if (!currentFile) return
+  document.getElementById('errorBox').style.display = 'none'
+  document.getElementById('resultBadge').style.display = 'none'
+  document.getElementById('alreadyBadge').style.display = 'none'
+  document.getElementById('downloadDiv').style.display = 'none'
+
+  try {
+    setProcessing('Figuring out the key...')
+    const info = await detectKey(currentFile)
+    const fromLabel = info.name + ' ' + cap(info.mode)
+
+    let shift = selectedKey - info.key
+    if (shift > 6) shift -= 12
+    if (shift < -6) shift += 12
+
+    const toLabel = NOTE_NAMES[selectedKey] + ' ' + cap(selectedMode)
+
+    if (shift === 0 && info.mode === selectedMode) {
+      document.getElementById('alreadyTitle').textContent = '✓ Already in ' + toLabel + '!'
+      document.getElementById('processingDiv').style.display = 'none'
+      document.getElementById('alreadyBadge').style.display = 'block'
+      document.getElementById('convertBtn').style.display = 'block'
+      return
+    }
+
+    setProcessing('Converting pitch — this may take a minute for longer songs...')
+    const ab2 = await currentFile.arrayBuffer()
+    const blob = new Blob([ab2], { type: currentFile.type })
+    const blobUrl = URL.createObjectURL(blob)
+    await Tone.start()
+    const toneBuffer = await Tone.Buffer.fromUrl(blobUrl)
+    URL.revokeObjectURL(blobUrl)
+
+    const rendered = await Tone.Offline(async () => {
+      const player = new Tone.Player(toneBuffer)
+      const ps = new Tone.PitchShift(shift)
+      player.connect(ps)
+      ps.toDestination()
+      player.start(0.1)
+    }, toneBuffer.duration + 0.5)
+
+    setProcessing('Almost done, saving your file...')
+    const wavBuf = encodeWAV(rendered.get())
+    const outBlob = new Blob([wavBuf], { type: 'audio/wav' })
+    const url = URL.createObjectURL(outBlob)
+    document.getElementById('downloadLink').href = url
+    document.getElementById('downloadLink').download = currentFile.name.replace(/\.[^.]+$/, '') + '_' + NOTE_NAMES[selectedKey] + '_' + selectedMode + '.wav'
+
+    document.getElementById('rbFrom').textContent = fromLabel
+    document.getElementById('rbTo').textContent = toLabel
+    document.getElementById('processingDiv').style.display = 'none'
+    document.getElementById('resultBadge').style.display = 'block'
+    document.getElementById('downloadDiv').style.display = 'block'
+  } catch(err) {
+    console.error(err)
+    document.getElementById('processingDiv').style.display = 'none'
+    document.getElementById('convertBtn').style.display = 'block'
+    showError('Something went wrong. Try a different file or refresh the page.')
+  }
+}
+
+document.getElementById('dropzone').addEventListener('click', () => document.getElementById('fileInput').click())
+document.getElementById('fileInput').addEventListener('change', e => pickFile(e.target.files?.[0]))
+document.getElementById('dropzone').addEventListener('dragover', e => { e.preventDefault(); document.getElementById('dropzone').classList.add('dragover') })
+document.getElementById('dropzone').addEventListener('dragleave', () => document.getElementById('dropzone').classList.remove('dragover'))
+document.getElementById('dropzone').addEventListener('drop', e => { e.preventDefault(); document.getElementById('dropzone').classList.remove('dragover'); pickFile(e.dataTransfer.files?.[0]) })
+document.getElementById('btnConvert').addEventListener('click', convert)
+document.getElementById('btnReset').addEventListener('click', reset)
+</script>
+</body>
+</html>
