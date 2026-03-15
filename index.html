@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Song Key Converter</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: #FDF8F0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      font-family: Georgia, serif;
+    }
+    .card {
+      background: white;
+      border-radius: 28px;
+      padding: 40px 36px;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 4px 32px rgba(180,130,40,0.12);
+      border: 1px solid #EDE0C4;
+    }
+    .header { text-align: center; margin-bottom: 28px; }
+    .header .icon { font-size: 42px; line-height: 1; margin-bottom: 8px; }
+    .header h1 { font-size: 26px; font-weight: 700; color: #2B1800; letter-spacing: -0.5px; }
+    .header p { color: #9A6E20; font-size: 14px; margin-top: 7px; font-family: system-ui, sans-serif; }
+
+    /* Steps */
+    .step {
+      margin-bottom: 24px;
+      border: 1px solid #EDE0C4;
+      border-radius: 18px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .step.active { border-color: #C47A0A; }
+    .step.done { border-color: #1E7A46; }
+    .step-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 18px;
+      background: #FDFAF4;
+    }
+    .step.active .step-header { background: #FFFAEE; }
+    .step.done .step-header { background: #F0FFF6; }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: #E8DCC8; color: #7A5500;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; font-family: system-ui, sans-serif;
+      flex-shrink: 0;
+    }
+    .step.active .step-num { background: #C47A0A; color: white; }
+    .step.done .step-num { background: #1E7A46; color: white; font-size: 14px; }
+    .step-title { font-size: 15px; font-weight: 700; color: #2B1800; font-family: system-ui, sans-serif; }
+    .step-sub { font-size: 12px; color: #9A6E20; font-family: system-ui, sans-serif; margin-top: 2px; }
+    .step-body { padding: 16px 18px; }
+
+    /* Dropzone */
+    .dropzone {
+      border: 2px dashed #DDD; border-radius: 14px; padding: 22px 16px;
+      text-align: center; cursor: pointer; background: #FAFAFA;
+      transition: all 0.18s;
+    }
+    .dropzone:hover, .dropzone.dragover { border-color: #C47A0A; background: #FFFAEE; }
+    .dropzone.has-file { border-color: #C47A0A; background: #FFFCF4; }
+    .dz-icon { font-size: 26px; margin-bottom: 6px; }
+    .dz-label { font-weight: 700; color: #555; font-size: 15px; font-family: system-ui, sans-serif; }
+    .dz-sub { color: #BBB; font-size: 12px; margin-top: 3px; font-family: system-ui, sans-serif; }
+    .dz-filename { font-weight: 600; color: #3D2000; font-size: 13px; word-break: break-all; font-family: system-ui, sans-serif; }
+
+    /* Recorder */
+    .recorder { text-align: center; }
+    .rec-visualizer {
+      width: 100%; height: 56px; border-radius: 12px;
+      background: #F8F4EE; margin-bottom: 14px;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; position: relative;
+    }
+    .rec-bars {
+      display: flex; align-items: center; gap: 3px; height: 100%;
+      padding: 8px 12px;
+    }
+    .rec-bar {
+      width: 4px; border-radius: 2px; background: #DDD;
+      transition: height 0.08s ease;
+      min-height: 4px;
+    }
+    .rec-bar.active { background: #C47A0A; }
+    .rec-idle-text {
+      font-size: 13px; color: #CCC; font-family: system-ui, sans-serif;
+      position: absolute;
+    }
+    .rec-controls { display: flex; gap: 10px; margin-bottom: 14px; }
+    .btn-rec {
+      flex: 1; padding: 14px 0; border-radius: 12px; border: none;
+      background: #C47A0A; color: white; font-size: 15px; font-weight: 700;
+      cursor: pointer; font-family: system-ui, sans-serif; transition: background 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-rec:hover { background: #A56508; }
+    .btn-rec.recording { background: #D83030; animation: recpulse 1.2s ease-in-out infinite; }
+    .btn-rec.recording:hover { background: #B52020; }
+    .btn-play {
+      flex: 1; padding: 14px 0; border-radius: 12px;
+      border: 1.5px solid #DDD; background: transparent;
+      color: #555; font-size: 15px; font-weight: 700;
+      cursor: pointer; font-family: system-ui, sans-serif; transition: all 0.15s;
+    }
+    .btn-play:hover { border-color: #C47A0A; color: #C47A0A; }
+    .btn-play:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .rec-status {
+      font-size: 13px; color: #9A6E20; font-family: system-ui, sans-serif;
+      text-align: center; min-height: 18px;
+    }
+    .rec-status.error { color: #A02020; }
+    .rec-status.success { color: #1E7A46; font-weight: 600; }
+
+    /* Detected key */
+    .detected-key {
+      background: #F0FFF6; border: 1px solid #9EE0BB; border-radius: 14px;
+      padding: 14px 18px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .dk-label { font-size: 12px; color: #2E7A56; font-family: system-ui, sans-serif; }
+    .dk-value { font-size: 22px; font-weight: 700; color: #1E5C38; }
+    .dk-retry {
+      font-size: 12px; color: #9A6E20; cursor: pointer;
+      font-family: system-ui, sans-serif; text-decoration: underline;
+      background: none; border: none; padding: 0;
+    }
+
+    /* Convert button */
+    .btn-convert {
+      width: 100%; padding: 17px 0; border-radius: 14px; border: none;
+      background: #C47A0A; color: white; font-size: 16px; font-weight: 700;
+      cursor: pointer; font-family: system-ui, sans-serif; letter-spacing: 0.3px;
+      margin-bottom: 10px; transition: background 0.15s;
+    }
+    .btn-convert:hover { background: #A56508; }
+    .btn-convert:disabled { background: #DDD; cursor: not-allowed; }
+
+    /* Processing */
+    .processing { text-align: center; padding: 18px 0; font-family: system-ui, sans-serif; }
+    .processing .spin { font-size: 28px; margin-bottom: 8px; display: inline-block; animation: pulse 1.4s ease-in-out infinite; }
+    .processing .msg { font-weight: 600; color: #C47A0A; font-size: 15px; }
+    .processing .sub { color: #CCC; font-size: 12px; margin-top: 4px; }
+
+    /* Result */
+    .result-badge {
+      background: #FFFAEE; border-radius: 14px; padding: 14px 20px;
+      margin-bottom: 14px; text-align: center; border: 1px solid #EDD888;
+    }
+    .result-badge .rb-label { font-size: 11px; color: #B08830; font-family: system-ui, sans-serif; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .result-badge .rb-keys { display: flex; align-items: center; justify-content: center; gap: 14px; }
+    .result-badge .rb-key { font-weight: 700; font-size: 20px; color: #4A2E00; }
+    .result-badge .rb-key.target { color: #1E7A46; }
+
+    .btn-download {
+      display: block; text-align: center; padding: 16px 0; border-radius: 14px;
+      background: #1E7A46; color: white; font-size: 16px; font-weight: 700;
+      text-decoration: none; font-family: system-ui, sans-serif; margin-bottom: 12px;
+      transition: background 0.15s;
+    }
+    .btn-download:hover { background: #155E35; }
+    .btn-reset {
+      width: 100%; padding: 11px 0; border-radius: 12px; border: 1.5px solid #DDD;
+      background: transparent; color: #999; font-size: 14px; cursor: pointer;
+      font-family: system-ui, sans-serif;
+    }
+    .btn-reset:hover { border-color: #BBB; color: #666; }
+
+    .error-box {
+      background: #FFF5F5; border: 1px solid #F5C6C6; border-radius: 10px;
+      padding: 13px; color: #A02020; font-size: 13px; margin-top: 10px;
+      font-family: system-ui, sans-serif;
+    }
+
+    .footer { text-align: center; color: #CCC; font-size: 12px; margin-top: 18px; font-family: system-ui, sans-serif; }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+    @keyframes recpulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <div class="icon">🎤</div>
+    <h1>Song Key Converter</h1>
+    <p>Sing a few notes — we'll detect your key and match the song to your voice</p>
+  </div>
+
+  <!-- Step 1: Upload song -->
+  <div class="step active" id="step1">
+    <div class="step-header">
+      <div class="step-num" id="s1num">1</div>
+      <div>
+        <div class="step-title">Upload your song</div>
+        <div class="step-sub">MP3 or WAV file</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="fileInput" accept="audio/*" style="display:none" />
+        <div class="dz-icon" id="dzIcon">📂</div>
+        <div class="dz-label" id="dzLabel">Tap here to choose your song</div>
+        <div class="dz-sub" id="dzSub">MP3 and WAV files work great</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Record vocal -->
+  <div class="step" id="step2">
+    <div class="step-header">
+      <div class="step-num" id="s2num">2</div>
+      <div>
+        <div class="step-title">Sing a few notes</div>
+        <div class="step-sub">Hum or sing 5–10 seconds so we can detect your key</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="recorder">
+        <div class="rec-visualizer" id="recVisualizer">
+          <div class="rec-bars" id="recBars"></div>
+          <div class="rec-idle-text" id="recIdleText">Press Record and start singing</div>
+        </div>
+        <div class="rec-controls">
+          <button class="btn-rec" id="btnRec" onclick="toggleRecord()">
+            <span id="recDot">●</span><span id="recLabel">Record</span>
+          </button>
+          <button class="btn-play" id="btnPlay" onclick="playback()" disabled>▶ Play back</button>
+        </div>
+        <div class="rec-status" id="recStatus">Allow microphone access when prompted</div>
+      </div>
+      <div id="detectedKeyDiv" style="display:none" class="detected-key">
+        <div>
+          <div class="dk-label">Your singing key</div>
+          <div class="dk-value" id="dkValue">—</div>
+        </div>
+        <button class="dk-retry" onclick="retryRecord()">Re-record</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Convert -->
+  <div class="step" id="step3">
+    <div class="step-header">
+      <div class="step-num" id="s3num">3</div>
+      <div>
+        <div class="step-title">Convert the song</div>
+        <div class="step-sub">Song will be shifted to match your voice</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div id="convertBtnDiv">
+        <button class="btn-convert" id="btnConvert" onclick="convert()" disabled>✨ Convert Song to My Key</button>
+      </div>
+      <div id="processingDiv" style="display:none" class="processing">
+        <div class="spin">⏳</div>
+        <div class="msg" id="procMsg">Working...</div>
+        <div class="sub">Keep this tab open while it works</div>
+      </div>
+      <div id="resultBadge" style="display:none" class="result-badge">
+        <div class="rb-label">Conversion complete</div>
+        <div class="rb-keys">
+          <div class="rb-key" id="rbFrom"></div>
+          <div style="font-size:20px;color:#DDB840">→</div>
+          <div class="rb-key target" id="rbTo"></div>
+        </div>
+      </div>
+      <div id="downloadDiv" style="display:none">
+        <a id="downloadLink" class="btn-download" href="#" download="">⬇️ Download Converted Song</a>
+        <button class="btn-reset" onclick="resetAll()">Start over</button>
+      </div>
+      <div id="errorBox" style="display:none" class="error-box"></div>
+    </div>
+  </div>
+
+  <div class="footer">🔒 Your voice and song never leave your device</div>
+</div>
+
+<script>
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
+const MAJOR_PROFILE = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88]
+const MINOR_PROFILE = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17]
+
+let songFile = null
+let mediaRecorder = null
+let recordedChunks = []
+let recordedBlob = null
+let recordedAudioBuffer = null
+let detectedVocalKey = null
+let detectedSongKey = null
+let isRecording = false
+let animFrameId = null
+let analyser = null
+let micStream = null
+let barEls = []
+
+// Build waveform bars
+const recBars = document.getElementById('recBars')
+for (let i = 0; i < 40; i++) {
+  const b = document.createElement('div')
+  b.className = 'rec-bar'
+  recBars.appendChild(b)
+  barEls.push(b)
+}
+
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1) }
+
+// --- Step state ---
+function setStepDone(stepEl, numEl) {
+  stepEl.classList.remove('active')
+  stepEl.classList.add('done')
+  numEl.textContent = '✓'
+}
+function setStepActive(stepEl) {
+  stepEl.classList.add('active')
+  stepEl.classList.remove('done')
+}
+
+// --- Song file ---
+function pickFile(f) {
+  if (!f || !f.type.startsWith('audio/')) { alert('Please choose an audio file.'); return }
+  songFile = f
+  document.getElementById('dzIcon').textContent = '🎶'
+  document.getElementById('dzLabel').className = 'dz-filename'
+  document.getElementById('dzLabel').textContent = f.name
+  document.getElementById('dzSub').textContent = 'Tap to change'
+  document.getElementById('dropzone').classList.add('has-file')
+  setStepDone(document.getElementById('step1'), document.getElementById('s1num'))
+  setStepActive(document.getElementById('step2'))
+  checkReadyToConvert()
+}
+
+document.getElementById('dropzone').addEventListener('click', () => document.getElementById('fileInput').click())
+document.getElementById('fileInput').addEventListener('change', e => pickFile(e.target.files?.[0]))
+document.getElementById('dropzone').addEventListener('dragover', e => { e.preventDefault(); document.getElementById('dropzone').classList.add('dragover') })
+document.getElementById('dropzone').addEventListener('dragleave', () => document.getElementById('dropzone').classList.remove('dragover'))
+document.getElementById('dropzone').addEventListener('drop', e => { e.preventDefault(); document.getElementById('dropzone').classList.remove('dragover'); pickFile(e.dataTransfer.files?.[0]) })
+
+// --- Recording ---
+async function toggleRecord() {
+  if (isRecording) {
+    stopRecording()
+  } else {
+    await startRecording()
+  }
+}
+
+async function startRecording() {
+  try {
+    document.getElementById('recStatus').textContent = 'Requesting microphone...'
+    document.getElementById('recStatus').className = 'rec-status'
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    const audioCtx = new AudioContext()
+    analyser = audioCtx.createAnalyser()
+    analyser.fftSize = 256
+    const src = audioCtx.createMediaStreamSource(micStream)
+    src.connect(analyser)
+
+    recordedChunks = []
+    mediaRecorder = new MediaRecorder(micStream)
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data) }
+    mediaRecorder.onstop = async () => {
+      recordedBlob = new Blob(recordedChunks, { type: 'audio/webm' })
+      document.getElementById('btnPlay').disabled = false
+      await analyzeVocal()
+    }
+    mediaRecorder.start()
+    isRecording = true
+
+    document.getElementById('btnRec').classList.add('recording')
+    document.getElementById('recDot').textContent = '■'
+    document.getElementById('recLabel').textContent = 'Stop'
+    document.getElementById('recStatus').textContent = 'Recording… sing some notes now!'
+    document.getElementById('recIdleText').style.display = 'none'
+    animateBars()
+  } catch(err) {
+    document.getElementById('recStatus').textContent = 'Microphone access denied. Please allow it and try again.'
+    document.getElementById('recStatus').className = 'rec-status error'
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop()
+  if (micStream) micStream.getTracks().forEach(t => t.stop())
+  isRecording = false
+  cancelAnimationFrame(animFrameId)
+  document.getElementById('btnRec').classList.remove('recording')
+  document.getElementById('recDot').textContent = '●'
+  document.getElementById('recLabel').textContent = 'Record'
+  document.getElementById('recStatus').textContent = 'Analysing your voice…'
+  barEls.forEach(b => { b.className = 'rec-bar'; b.style.height = '4px' })
+}
+
+function animateBars() {
+  if (!analyser) return
+  const data = new Uint8Array(analyser.frequencyBinCount)
+  function frame() {
+    analyser.getByteFrequencyData(data)
+    barEls.forEach((b, i) => {
+      const idx = Math.floor(i * data.length / barEls.length)
+      const h = Math.max(4, (data[idx] / 255) * 44)
+      b.style.height = h + 'px'
+      b.className = 'rec-bar active'
+    })
+    animFrameId = requestAnimationFrame(frame)
+  }
+  frame()
+}
+
+async function playback() {
+  if (!recordedBlob) return
+  const url = URL.createObjectURL(recordedBlob)
+  const a = new Audio(url)
+  a.play()
+}
+
+function retryRecord() {
+  document.getElementById('detectedKeyDiv').style.display = 'none'
+  document.getElementById('recStatus').textContent = 'Press Record and start singing'
+  document.getElementById('recStatus').className = 'rec-status'
+  document.getElementById('recIdleText').style.display = 'block'
+  document.getElementById('btnPlay').disabled = true
+  detectedVocalKey = null
+  document.getElementById('btnConvert').disabled = true
+  barEls.forEach(b => { b.className = 'rec-bar'; b.style.height = '4px' })
+}
+
+// --- FFT ---
+function iterativeFFT(re, im) {
+  const n = re.length; let j = 0
+  for (let i = 1; i < n; i++) {
+    let bit = n >> 1
+    for (; j & bit; bit >>= 1) j ^= bit
+    j ^= bit
+    if (i < j) {
+      let t = re[i]; re[i] = re[j]; re[j] = t
+      t = im[i]; im[i] = im[j]; im[j] = t
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = -2*Math.PI/len, wRe = Math.cos(ang), wIm = Math.sin(ang)
+    for (let i = 0; i < n; i += len) {
+      let uRe = 1, uIm = 0
+      for (let k = 0; k < (len>>1); k++) {
+        const idx = i+k+(len>>1)
+        const eR=re[i+k],eI=im[i+k],oR=re[idx]*uRe-im[idx]*uIm,oI=re[idx]*uIm+im[idx]*uRe
+        re[i+k]=eR+oR;im[i+k]=eI+oI;re[idx]=eR-oR;im[idx]=eI-oI
+        const nr=uRe*wRe-uIm*wIm;uIm=uRe*wIm+uIm*wRe;uRe=nr
+      }
+    }
+  }
+}
+
+async function chromaFromBlob(blob) {
+  const ab = await blob.arrayBuffer()
+  const ctx = new AudioContext()
+  const buf = await ctx.decodeAudioData(ab)
+  await ctx.close()
+  const sr = 8000
+  const off = new OfflineAudioContext(1, Math.ceil(buf.duration*sr), sr)
+  const src = off.createBufferSource(); src.buffer = buf
+  src.connect(off.destination); src.start(0)
+  const resampled = await off.startRendering()
+  const data = resampled.getChannelData(0)
+  const N=2048, hop=1024
+  const chroma = new Float64Array(12)
+  const hann = Array.from({length:N},(_,i)=>0.5*(1-Math.cos(2*Math.PI*i/(N-1))))
+  for (let s=0; s+N<data.length; s+=hop) {
+    const re=new Float64Array(N), im=new Float64Array(N)
+    for (let i=0;i<N;i++) re[i]=data[s+i]*hann[i]
+    iterativeFFT(re,im)
+    for (let k=1;k<N/2;k++) {
+      const freq=k*sr/N
+      if (freq<80||freq>1200) continue
+      const midi=12*Math.log2(freq/440)+69
+      const bin=((Math.round(midi)%12)+12)%12
+      chroma[bin]+=Math.sqrt(re[k]**2+im[k]**2)
+    }
+  }
+  return chroma
+}
+
+function detectKeyFromChroma(chroma) {
+  const mx = Math.max(...chroma)
+  const norm = Array.from(chroma, v=>v/(mx+1e-8))
+  const corr=(a,b)=>{
+    const mA=a.reduce((x,y)=>x+y)/12,mB=b.reduce((x,y)=>x+y)/12
+    let num=0,dA=0,dB=0
+    for(let i=0;i<12;i++){num+=(a[i]-mA)*(b[i]-mB);dA+=(a[i]-mA)**2;dB+=(b[i]-mB)**2}
+    return num/(Math.sqrt(dA*dB)+1e-8)
+  }
+  let best=-Infinity,bestKey=0,bestMode='major'
+  for (let i=0;i<12;i++){
+    const rot=[...norm.slice(i),...norm.slice(0,i)]
+    const mc=corr(rot,MAJOR_PROFILE),nc=corr(rot,MINOR_PROFILE)
+    if(mc>best){best=mc;bestKey=i;bestMode='major'}
+    if(nc>best){best=nc;bestKey=i;bestMode='minor'}
+  }
+  return {key:bestKey,mode:bestMode,name:NOTE_NAMES[bestKey]}
+}
+
+async function analyzeVocal() {
+  try {
+    const chroma = await chromaFromBlob(recordedBlob)
+    detectedVocalKey = detectKeyFromChroma(chroma)
+    const label = detectedVocalKey.name + ' ' + cap(detectedVocalKey.mode)
+    document.getElementById('dkValue').textContent = label
+    document.getElementById('detectedKeyDiv').style.display = 'flex'
+    document.getElementById('recStatus').textContent = '✓ Key detected from your voice!'
+    document.getElementById('recStatus').className = 'rec-status success'
+    setStepDone(document.getElementById('step2'), document.getElementById('s2num'))
+    setStepActive(document.getElementById('step3'))
+    checkReadyToConvert()
+  } catch(err) {
+    document.getElementById('recStatus').textContent = 'Could not detect key. Try recording again with more sustained notes.'
+    document.getElementById('recStatus').className = 'rec-status error'
+  }
+}
+
+function checkReadyToConvert() {
+  document.getElementById('btnConvert').disabled = !(songFile && detectedVocalKey)
+}
+
+// --- WAV encoder ---
+function encodeWAV(audioBuffer) {
+  const ch = audioBuffer.getChannelData(0)
+  const buf = new ArrayBuffer(44+ch.length*2)
+  const v = new DataView(buf)
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))}
+  ws(0,'RIFF');v.setUint32(4,36+ch.length*2,true);ws(8,'WAVE')
+  ws(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true)
+  v.setUint16(22,1,true);v.setUint32(24,audioBuffer.sampleRate,true)
+  v.setUint32(28,audioBuffer.sampleRate*2,true);v.setUint16(32,2,true)
+  v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,ch.length*2,true)
+  let off=44
+  for(let i=0;i<ch.length;i++){
+    const s=Math.max(-1,Math.min(1,ch[i]))
+    v.setInt16(off,s<0?s*32768:s*32767,true);off+=2
+  }
+  return buf
+}
+
+// --- Convert ---
+async function convert() {
+  if (!songFile || !detectedVocalKey) return
+  document.getElementById('errorBox').style.display = 'none'
+  document.getElementById('convertBtnDiv').style.display = 'none'
+  document.getElementById('processingDiv').style.display = 'block'
+
+  try {
+    document.getElementById('procMsg').textContent = 'Detecting song key...'
+    const songChroma = await chromaFromBlob(songFile)
+    detectedSongKey = detectKeyFromChroma(songChroma)
+
+    let shift = detectedVocalKey.key - detectedSongKey.key
+    if (shift > 6) shift -= 12
+    if (shift < -6) shift += 12
+
+    const fromLabel = detectedSongKey.name + ' ' + cap(detectedSongKey.mode)
+    const toLabel = detectedVocalKey.name + ' ' + cap(detectedVocalKey.mode)
+
+    if (shift === 0) {
+      document.getElementById('procMsg').textContent = ''
+      document.getElementById('processingDiv').style.display = 'none'
+      document.getElementById('rbFrom').textContent = fromLabel
+      document.getElementById('rbTo').textContent = toLabel
+      document.getElementById('resultBadge').style.display = 'block'
+      document.getElementById('resultBadge').querySelector('.rb-label').textContent = 'Song is already in your key!'
+      document.getElementById('downloadDiv').style.display = 'block'
+      // still offer download of original as WAV for convenience
+      const ab = await songFile.arrayBuffer()
+      const blob = new Blob([ab], {type: songFile.type})
+      const url = URL.createObjectURL(blob)
+      document.getElementById('downloadLink').href = url
+      document.getElementById('downloadLink').download = songFile.name
+      return
+    }
+
+    document.getElementById('procMsg').textContent = 'Shifting pitch — hang tight for longer songs...'
+    const ab2 = await songFile.arrayBuffer()
+    const blob = new Blob([ab2], { type: songFile.type })
+    const blobUrl = URL.createObjectURL(blob)
+    await Tone.start()
+    const toneBuffer = await Tone.Buffer.fromUrl(blobUrl)
+    URL.revokeObjectURL(blobUrl)
+
+    const rendered = await Tone.Offline(async () => {
+      const player = new Tone.Player(toneBuffer)
+      const ps = new Tone.PitchShift(shift)
+      player.connect(ps)
+      ps.toDestination()
+      player.start(0.1)
+    }, toneBuffer.duration + 0.5)
+
+    document.getElementById('procMsg').textContent = 'Saving your file...'
+    const wavBuf = encodeWAV(rendered.get())
+    const outBlob = new Blob([wavBuf], { type: 'audio/wav' })
+    const url = URL.createObjectURL(outBlob)
+    document.getElementById('downloadLink').href = url
+    document.getElementById('downloadLink').download = songFile.name.replace(/\.[^.]+$/,'') + '_' + detectedVocalKey.name + '_' + detectedVocalKey.mode + '.wav'
+
+    document.getElementById('rbFrom').textContent = fromLabel
+    document.getElementById('rbTo').textContent = toLabel
+    document.getElementById('processingDiv').style.display = 'none'
+    document.getElementById('resultBadge').style.display = 'block'
+    document.getElementById('downloadDiv').style.display = 'block'
+    setStepDone(document.getElementById('step3'), document.getElementById('s3num'))
+
+  } catch(err) {
+    console.error(err)
+    document.getElementById('processingDiv').style.display = 'none'
+    document.getElementById('convertBtnDiv').style.display = 'block'
+    document.getElementById('errorBox').textContent = '⚠️ Something went wrong. Try a different file or refresh the page.'
+    document.getElementById('errorBox').style.display = 'block'
+  }
+}
+
+function resetAll() {
+  songFile = null; detectedVocalKey = null; detectedSongKey = null
+  recordedBlob = null; recordedChunks = []
+
+  document.getElementById('dzIcon').textContent = '📂'
+  document.getElementById('dzLabel').className = 'dz-label'
+  document.getElementById('dzLabel').textContent = 'Tap here to choose your song'
+  document.getElementById('dzSub').textContent = 'MP3 and WAV files work great'
+  document.getElementById('dropzone').classList.remove('has-file')
+  document.getElementById('fileInput').value = ''
+
+  document.getElementById('detectedKeyDiv').style.display = 'none'
+  document.getElementById('recStatus').textContent = 'Press Record and start singing'
+  document.getElementById('recStatus').className = 'rec-status'
+  document.getElementById('recIdleText').style.display = 'block'
+  document.getElementById('btnPlay').disabled = true
+  barEls.forEach(b => { b.className='rec-bar'; b.style.height='4px' })
+
+  document.getElementById('convertBtnDiv').style.display = 'block'
+  document.getElementById('btnConvert').disabled = true
+  document.getElementById('processingDiv').style.display = 'none'
+  document.getElementById('resultBadge').style.display = 'none'
+  document.getElementById('downloadDiv').style.display = 'none'
+  document.getElementById('errorBox').style.display = 'none'
+
+  ;['step1','step2','step3'].forEach(id => {
+    const s = document.getElementById(id)
+    s.classList.remove('done','active')
+  })
+  ;[['s1num','1'],['s2num','2'],['s3num','3']].forEach(([id,v]) => document.getElementById(id).textContent=v)
+  setStepActive(document.getElementById('step1'))
+}
+</script>
+</body>
+</html>
